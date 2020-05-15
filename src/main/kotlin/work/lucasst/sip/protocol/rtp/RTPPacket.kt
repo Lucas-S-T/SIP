@@ -5,14 +5,12 @@ import kotlin.random.Random
 
 class RTPPacket (var version: Int = 2, var padding: Int = 0, var extension: Int = 0, var csic: Int = 0, var  marker: Int = 0, var payloadType: Int){
 
-
     val sync = Random.nextBits(32)
 
     var seq: Short = Random.nextInt(500).toShort()
     var timestamp = Random.nextInt()
 
-
-    fun getToSend(payload: ByteArray, timestamp: Int): ByteArray{
+    fun writePayload(payload: ByteArray, timestamp: Int): ByteArray{
 
         var buffer: ByteBuffer = ByteBuffer.allocate(2)
         buffer.putShort(seq)
@@ -65,7 +63,10 @@ class RTPPacket (var version: Int = 2, var padding: Int = 0, var extension: Int 
     }
 
 
+}
 
+fun getRTCPacketPayload(data: ByteArray): ByteArray{
 
+    return data.copyOfRange(data.size-160, data.size)
 
 }
