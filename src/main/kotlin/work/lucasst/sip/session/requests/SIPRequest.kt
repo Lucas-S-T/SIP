@@ -5,7 +5,7 @@ import work.lucasst.sip.protocol.header.SIPRequestLine
 import java.lang.StringBuilder
 
 
-class SIPRequest(var method: SIPRequestLine, var headers: MutableList<SIPHeader>) {
+class SIPRequest(var method: SIPRequestLine, var headers: MutableList<SIPHeader>, var payload: String = "") {
 
     override fun toString(): String{
 
@@ -17,7 +17,12 @@ class SIPRequest(var method: SIPRequestLine, var headers: MutableList<SIPHeader>
                 sb.append("$h\r\n")
             }
 
+        if(payload.isNotEmpty()){
+            sb.append("Content-Length: "+payload.length+"\r\n")
+        }
+
         sb.append("\r\n")
+        sb.append(payload)
 
         return sb.toString()
 

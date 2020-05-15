@@ -32,7 +32,6 @@ class RegisterPacket(val manager: SIPManager): UDP() {
 
         val request =  SIPRequest(SIPRequestLine("REGISTER", "sip:${manager.address}:${manager.port}", "SIP/2.0"), headers)
 
-        println(request.toString())
 
         val buf = request.toString().toByteArray()
 
@@ -45,7 +44,6 @@ class RegisterPacket(val manager: SIPManager): UDP() {
 
         var resp = parseResponse(String(packet.data))
 
-        println(resp.toString())
 
 
         if(resp.status.status == 401){
@@ -110,7 +108,6 @@ class RegisterPacket(val manager: SIPManager): UDP() {
                 )
                 val request =  SIPRequest(SIPRequestLine("REGISTER", "sip:${manager.address}:${manager.port}", "SIP/2.0"), headers)
 
-                println(request.toString())
                 val buf = request.toString().toByteArray()
                 s.send(DatagramPacket(buf, buf.size, manager.inetAddress, manager.port))
 

@@ -5,7 +5,7 @@ import work.lucasst.sip.protocol.header.SIPStatusLine
 import java.lang.StringBuilder
 
 
-class SIPResponse(var status: SIPStatusLine, var headers: MutableList<SIPHeader>) {
+class SIPResponse(var status: SIPStatusLine, var headers: MutableList<SIPHeader>, var payload: String) {
 
     override fun toString(): String {
 
@@ -60,7 +60,17 @@ fun parseResponse(data: String): SIPResponse {
 
     }
 
-    var s = SIPResponse(sl, headers)
+
+    var payload = ""
+
+    var p = data.split("\r\n\r\n")
+
+    if(p.size >1){
+        payload = p[1]
+    }
+
+
+    var s = SIPResponse(sl, headers, payload)
 
 
 
