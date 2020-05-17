@@ -25,7 +25,7 @@ fun main(){
 
 
     }
-
+/*
     invite.onConnect = {
 
         println("Destinatário conectado na outra ponta (200 OK) -> Transmitindo áudio")
@@ -58,8 +58,13 @@ fun main(){
         }
 
     }
-
+*/
     invite.execute()
+
+        println("waiting")
+        Thread.sleep(20000)
+
+    invite.close()
 
 
 

@@ -8,6 +8,7 @@ import work.lucasst.sip.protocol.header.SIPRequestLine
 import work.lucasst.sip.protocol.sdp.SDP
 import work.lucasst.sip.protocol.sdp.parseSDP
 import work.lucasst.sip.session.requests.SIPRequest
+import work.lucasst.sip.session.responses.impl.get200ByeResponse
 import work.lucasst.sip.session.responses.parseResponse
 import java.net.DatagramPacket
 import java.util.*
@@ -16,26 +17,28 @@ class InviteRequest(val manager: SIPManager, val sipAddress: String ): UDP() {
 
     var callID = UUID.randomUUID().toString()
     var sdp: SDP? = null
+    var isConnected = false
+    var isCancelled = false
 
     var onSDPOpen: (sdp: SDP) -> Unit = {}
     var onConnect: () -> Unit = {}
+    var onCallEnd: () -> Unit = {}
 
+    val headers = mutableListOf(
 
+            SIPHeader("Via", "SIP/2.0/UDP ${manager.address}:${manager.port};rport=0", mutableListOf(SIPParameter("branch", UUID.randomUUID().toString()))),
+            SIPHeader("Max-Forwards", "100"),
+            SIPHeader("To", "$sipAddress"),
+            SIPHeader("From", "sip:${manager.username}@${manager.address}", mutableListOf(SIPParameter("tag", UUID.randomUUID().toString()))),
+            SIPHeader("Contact", "<$sipAddress>"),
+            SIPHeader("Call-ID", callID),
+            SIPHeader("Content-Type", "application/sdp")
+
+    )
 
     override fun firstPacket(): DatagramPacket {
 
-        val headers = mutableListOf(
 
-                SIPHeader("Via", "SIP/2.0/UDP ${manager.address}:${manager.port};rport=0", mutableListOf(SIPParameter("branch", UUID.randomUUID().toString()))),
-                SIPHeader("Max-Forwards", "100"),
-                SIPHeader("To", "$sipAddress"),
-                SIPHeader("From", "sip:${manager.username}@${manager.address}", mutableListOf(SIPParameter("tag", UUID.randomUUID().toString()))),
-                SIPHeader("Contact", "<$sipAddress>"),
-                SIPHeader("Call-ID", callID),
-                SIPHeader("CSeq", "0 INVITE"),
-                SIPHeader("Content-Type", "application/sdp")
-
-        )
 
 
         var payload = "v=0\r\n" +
@@ -69,7 +72,10 @@ class InviteRequest(val manager: SIPManager, val sipAddress: String ): UDP() {
                 "a=candidate:Hc0a83867 2 UDP 2130706430 192.168.56.103 51509 typ host\r\n" +
                 "a=candidate:Hc0a8c802 2 UDP 2130706430 192.168.200.2 51509 typ host\r\n"
 
-        val request =  SIPRequest(SIPRequestLine("INVITE", sipAddress, "SIP/2.0"), headers, payload)
+        val iheaders = headers
+        iheaders.add(SIPHeader("CSeq", "0 INVITE"))
+
+        val request =  SIPRequest(SIPRequestLine("INVITE", sipAddress, "SIP/2.0"), iheaders, payload)
 
 
         val buf = request.toString().toByteArray()
@@ -82,16 +88,57 @@ class InviteRequest(val manager: SIPManager, val sipAddress: String ): UDP() {
     override fun onReceive(packet: DatagramPacket): Boolean {
 
         //TODO, eventos, when connect, when open, bye function
+        //TODO quando o servidor mandar bye, devo mandar um 200 OK
+        //TODO devo mandar bye e esperar 200 ok do servidor, não preciso mandar ACK
+
+
+        //TODO Lucas do futuro, ignore a gambiarra abaixo, eu estava sem tempo no dia, mas se um dia você precisar resolver isso
+        //TODO você deve verificar no parseResponse se realmente é uma responsta e não uma requisição que o servidor enviou
+        //TODO faça o mesmo no parseRequest. Boa sorte ;)
+
+
+        var data = String(packet.data)
+
+
+        if(data.startsWith("BYE", true)){
+            println("bye")
+
+            var p = get200ByeResponse(manager, callID, sipAddress)
+            val buf = p.toString().toByteArray()
+            s.send(DatagramPacket(buf, buf.size, manager.inetAddress, manager.port))
+
+            onCallEnd()
+            return false
+
+        }
 
         var resp = parseResponse(String(packet.data))
 
         if(resp.status.status == 200){
 
-           //TODO responder ACK
 
-            onConnect()
 
-            return false
+            if(!isConnected) {
+
+                sendACK()
+                onConnect()
+                isConnected = true
+
+            }
+
+
+            if(isCancelled){
+
+                sendACK()
+                onCallEnd()
+                return false
+
+            }
+
+
+
+
+
 
         }
 
@@ -103,10 +150,60 @@ class InviteRequest(val manager: SIPManager, val sipAddress: String ): UDP() {
         }
 
 
-
-
-        return true
+        sendACK()
+        onCallEnd()
+        return false
     }
+
+
+    private fun sendACK(){
+
+        val request =  SIPRequest(SIPRequestLine("ACK", sipAddress, "SIP/2.0"), headers)
+
+        val buf = request.toString().toByteArray()
+
+        s.send(DatagramPacket(buf, buf.size, manager.inetAddress, manager.port))
+
+    }
+
+
+    fun close(){
+
+        if(!isCancelled && !isConnected){
+
+
+            val cheaders = headers
+            cheaders.add(SIPHeader("CSeq", "0 CANCEL"))
+
+            val request =  SIPRequest(SIPRequestLine("CANCEL", sipAddress, "SIP/2.0"), cheaders)
+
+            val buf = request.toString().toByteArray()
+
+            s.send(DatagramPacket(buf, buf.size, manager.inetAddress, manager.port))
+
+
+
+            isCancelled = true
+        }
+
+        if(isConnected){
+
+            val cheaders = headers
+            cheaders.add(SIPHeader("CSeq", "0 BYE"))
+
+            val request =  SIPRequest(SIPRequestLine("BYE", sipAddress, "SIP/2.0"), cheaders)
+
+            val buf = request.toString().toByteArray()
+
+            s.send(DatagramPacket(buf, buf.size, manager.inetAddress, manager.port))
+
+            isCancelled = true
+        }
+
+
+    }
+
+
 
 
 
